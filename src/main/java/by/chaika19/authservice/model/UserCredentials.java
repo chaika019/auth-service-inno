@@ -18,9 +18,8 @@ public class UserCredentials {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    //login
     @Column(nullable = false, unique = true)
-    private String email;
+    private String login;
 
     @Column(nullable = false)
     private String password;
@@ -28,6 +27,15 @@ public class UserCredentials {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private UserRole role;
+
+    @Column(nullable = false, length = 50)
+    private String name;
+
+    @Column(nullable = false, length = 50)
+    private String surname;
+
+    @Column(name = "birth_date")
+    private java.time.LocalDate birthDate;
 
     @Override
     public boolean equals(Object o) {

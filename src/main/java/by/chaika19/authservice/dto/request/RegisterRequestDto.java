@@ -6,15 +6,15 @@ import java.time.LocalDate;
 
 public record RegisterRequestDto(
 
-        @NotBlank(message = "Password is required")
-        @Size(min = 8, max = 30, message = "Password should be between {min} and {max} characters")
-        String password,
-
         //email типо
         @NotBlank(message = "Login (email) should not be blank")
         @Size(min = 3, max = 50, message = "Login should be between {min} and {max} characters")
         @Email(message = "Invalid email")
         String login,
+
+        @NotBlank(message = "Password is required")
+        @Size(min = 8, max = 30, message = "Password should be between {min} and {max} characters")
+        String password,
 
         @NotBlank(message = "Name should not be blank")
         @Size(min = 1, max = 255, message = "Name should be between {min} and {max} characters")

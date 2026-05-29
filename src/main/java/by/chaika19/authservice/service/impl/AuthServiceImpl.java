@@ -12,6 +12,7 @@ import by.chaika19.authservice.security.JwtTokenProvider;
 import by.chaika19.authservice.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,24 +24,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthServiceImpl implements AuthService {
 
     private final UserCredentialsRepository credentialsRepository;
-    //TODO PasswordEncoderConfig will implements in next PR
     private final PasswordEncoder passwordEncoder;
-    //TODO JwtTokenProvider will implements in next PR
     private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
     public void register(RegisterRequestDto regDto) {
         log.info("Attempting to register credentials for email: {}", regDto.login());
 
-        if(credentialsRepository.existsByEmail(regDto.login())) {
+        if(credentialsRepository.existsByLogin(regDto.login())) {
             log.warn("Registration failed: email {} is already taken", regDto.login());
             throw new BusinessException("User with email " + regDto.login() + " already exists");
         }
 
         UserCredentials userCredentials = UserCredentials.builder()
-                .email(regDto.login())
+                .login(regDto.login())
                 .password(passwordEncoder.encode(regDto.password()))
-                .role(UserRole.USER)
+                .role(UserRole.ROLE_USER)
+                .name(regDto.name())
+                .surname(regDto.surname())
+                .birthDate(regDto.birthDate())
                 .build();
 
         credentialsRepository.save(userCredentials);
@@ -50,22 +52,23 @@ public class AuthServiceImpl implements AuthService {
     public TokenResponseDto login(LoginRequestDto logDto) {
         log.info("Login attempt for email: {}", logDto.login());
 
-        UserCredentials userCredentials = credentialsRepository.findByEmail(logDto.login())
+        UserCredentials userCredentials = credentialsRepository.findByLogin(logDto.login())
                 .orElseThrow(() -> {
                     log.warn("Login failed: user with email {} not found", logDto.login());
-                    return new BusinessException("Invalid email or password");
+                    return new BadCredentialsException("Invalid email or password");
                 });
 
         if (!passwordEncoder.matches(logDto.password(), userCredentials.getPassword())) {
             log.warn("Login failed: incorrect password for email {}", logDto.login());
-            throw new BusinessException("Invalid email or password");
+            throw new BadCredentialsException("Invalid email or password");
         }
 
         String accessToken = jwtTokenProvider.generateAccessToken(
                 userCredentials.getId(), userCredentials.getRole().name()
         );
         String refreshToken = jwtTokenProvider.generateRefreshToken(
-                userCredentials.getId()
+                userCredentials.getId(),
+                userCredentials.getRole().name()
         );
 
         log.info("User {} successfully logged in. JWT tokens generated.", logDto.login());
@@ -75,13 +78,12 @@ public class AuthServiceImpl implements AuthService {
     public TokenValidateResponseDto validate(String token) {
         return jwtTokenProvider.parseAndValidateToken(token)
                 .map(claims -> new TokenValidateResponseDto(
-                        true,
                         Long.parseLong(claims.getSubject()),
                         claims.get(JwtTokenProvider.CLAIM_ROLE, String.class)
                 ))
-                .orElseGet(() -> {
+                .orElseThrow(() -> {
                     log.warn("Token validation failed (expired or invalid signature)");
-                    return new TokenValidateResponseDto(false, null, null);
+                    return new BadCredentialsException("Token is invalid or expired");
                 });
     }
 
@@ -89,6 +91,7 @@ public class AuthServiceImpl implements AuthService {
         log.info("Token refresh request received");
 
         return jwtTokenProvider.parseAndValidateToken(refreshToken)
+                .filter(claims -> JwtTokenProvider.TYPE_REFRESH.equals(claims.get(JwtTokenProvider.CLAIM_TYPE, String.class)))
                 .map(claims -> {
                     Long id = Long.valueOf(claims.getSubject());
 
@@ -101,7 +104,7 @@ public class AuthServiceImpl implements AuthService {
                     String currentRole = userCredentials.getRole().name();
 
                     String newAccessToken = jwtTokenProvider.generateAccessToken(id, currentRole);
-                    String newRefreshToken = jwtTokenProvider.generateRefreshToken(id);
+                    String newRefreshToken = jwtTokenProvider.generateRefreshToken(id, currentRole);
 
                     log.info("JWT token pair successfully refreshed for user ID: {}", id);
                     return new TokenResponseDto(newAccessToken, newRefreshToken);

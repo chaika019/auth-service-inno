@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 public class AuthController {
 
     private final AuthService authService;
@@ -36,11 +36,13 @@ public class AuthController {
 
     @PostMapping("/validate")
     public ResponseEntity<TokenValidateResponseDto> validate(@Valid @RequestBody TokenValidateRequestDto tokenValidateRequestDto) {
-        return new ResponseEntity<>(authService.validate(tokenValidateRequestDto.validateToken()), HttpStatus.OK);
+        TokenValidateResponseDto responseDto = authService.validate(tokenValidateRequestDto.validateToken());
+        return new ResponseEntity<>(responseDto, HttpStatus.OK);
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponseDto> refresh(@Valid @RequestBody TokenRefreshRequestDto tokenRefreshRequestDto) {
-        return new ResponseEntity<>(authService.refresh(tokenRefreshRequestDto.refreshToken()), HttpStatus.OK);
+        TokenResponseDto responseDto = authService.refresh(tokenRefreshRequestDto.refreshToken());
+        return new ResponseEntity<>(responseDto, HttpStatus.OK);
     }
 }
